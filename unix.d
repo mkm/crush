@@ -13,6 +13,7 @@ extern (C) {
   int execve(char*, char**, char**);
 
   byte exitStatus(Pid);
+  int accessExecute(const char*);
   char** getEnviron();
 }
 
@@ -42,6 +43,13 @@ int sysExec(string prog, string[] args, string[] env) {
   }
   free(ccenv);
   return ret;
+}
+
+bool isExecutable(string path) {
+  char* cpath = cstringFromString(path);
+  int ret = accessExecute(cpath);
+  free(cpath);
+  return ret == 0;
 }
 
 string[string] retrieveEnviron() {
