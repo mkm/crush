@@ -14,8 +14,10 @@ class EOFLineException : object.Exception {
   }
 }
 
-string readLine() {
-  char* cs = readline("crush> ");
+string readLine(string prompt) {
+  char* cprompt = cstringFromString(prompt);
+  char* cs = readline(cprompt);
+  free(cprompt);
   try {
     string s = stringFromCString(cs);
     free(cs);

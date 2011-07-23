@@ -192,6 +192,10 @@ class Shell {
       throw new ProcessCallException("Not found");
     }
   }
+
+  @property string prompt() {
+    return env.cwd.toString() ~ "$ ";
+  }
 }
 
 interface Action {

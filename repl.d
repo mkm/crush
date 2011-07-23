@@ -10,7 +10,7 @@ void replMain() {
   try {
     while (true) {
       string s;
-      s = readLine();
+      s = readLine(sh.prompt);
       if (s != "") {
         sh.runCommand(s);
       }
