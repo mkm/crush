@@ -11,6 +11,8 @@ extern (C) {
   Pid fork();
   void _exit(int);
   int execve(char*, char**, char**);
+  char* get_current_dir_name();
+  int chdir(const char*);
 
   byte exitStatus(Pid);
   int accessExecute(const char*);
@@ -62,4 +64,17 @@ string[string] retrieveEnviron() {
     }
   }
   return env;
+}
+
+string currentWorkingDir() {
+  char* cdir = get_current_dir_name();
+  string dir = stringFromCString(cdir);
+  free(cdir);
+  return dir;
+}
+
+void changeWorkingDir(string dir) {
+  char* cdir = cstringFromString(dir);
+  chdir(cdir);
+  free(cdir);
 }
