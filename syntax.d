@@ -36,35 +36,60 @@ private class Parser {
   
   Expr line() {
     immutable string prog = token();
-    immutable string[] args = many(&token);
+    immutable string[] args = many(&entity);
     return new ProcessCallExpr(prog, args);
   }
 
+  string entity() {
+    int pos = this.pos;
+    try {
+      return quotedToken();
+    } catch (ParseException e) {
+      this.pos = pos;
+      return token();
+    }
+  }
+  
   string token() {
     many(&ws);
-    string s = many1(&nonws);
+    string s = many1(&stdch);
+    many(&ws);
+    return s;
+  }
+
+  string quotedToken() {
+    many(&ws);
+    quote();
+    string s = many(&nonquote);
+    quote();
     many(&ws);
     return s;
   }
 
   char ws() {
-    char c = current();
-    if (c == '\n' || c == '\t' || c == ' ') {
-      advance();
-      return c;
-    } else {
-      throw new ParseException("Expected whitespace");
-    }
+    return ch(delegate(char c) { return c == '\n' || c == '\t' || c == ' '; });
   }
 
-  char nonws() {
+  char stdch() {
+    return ch(delegate(char c) { return c > ' ' && c != '"'; });
+  }
+
+  char quote() {
+    return ch(delegate(char c) { return c == '"'; });
+  }
+
+  char nonquote() {
+    return ch(delegate(char c) { return c != '"'; });
+  }
+
+  char ch(bool delegate(char) pred) {
     char c = current();
-    if (c != '\n' && c != '\n' && c != ' ') {
+    if (pred(c)) {
       advance();
       return c;
     } else {
-      throw new ParseException("Expected non-whitespace");
-    }    
+      throw new ParseException("Unexpected character");
+    }
   }
   
   immutable(T[]) many(T)(T delegate() p) {
