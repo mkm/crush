@@ -113,12 +113,20 @@ class Environment {
     return _cwd;
   }
 
+  @property Path home() {
+    return new Path(get("HOME", "/"));
+  }
+  
   void changeWorkDir(Path path) {
     _cwd = _cwd ~ path;
   }
   
   string opIndex(string k) {
     return vars[k];
+  }
+
+  string get(string k, lazy string def) {
+    return vars.get(k, def);
   }
 
   void opIndexAssign(string v, string k) {
@@ -152,6 +160,14 @@ class Shell {
     string content = readText(filename);
     ScriptExpr expr = parseScript(content);
     runScriptExpr(expr);
+  }
+
+  void executeRunCommands(string rcfilename) {
+    try {
+      runFile(env.home.toString() ~ "/" ~ rcfilename, []);
+    } catch (FileException e) {
+      
+    }
   }
   
   void runProcessCallExpr(ProcessCallExpr expr) {

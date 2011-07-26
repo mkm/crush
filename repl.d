@@ -5,8 +5,7 @@ import std.stdio;
 import readline;
 import shell;
 
-void replMain() {
-  Shell sh = new Shell(Environment.standardEnvironment());
+void replMain(Shell sh) {
   try {
     while (true) {
       string s;

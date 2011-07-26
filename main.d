@@ -10,15 +10,16 @@ import shell;
 int main(string[] args) {
   getopt(args);
   args = args[1 .. $];
+  Shell sh = new Shell(Environment.standardEnvironment());
+  sh.executeRunCommands(".crushrc");
   if (args.length >= 1) {
-    runBatch(args[0], args[1 .. $]);
+    runBatch(sh, args[0], args[1 .. $]);
   } else {
-    replMain();
+    replMain(sh);
   }
   return 0;
 }
 
-void runBatch(string filename, string[] args) {
-  Shell sh = new Shell(Environment.standardEnvironment());
+void runBatch(Shell sh, string filename, string[] args) {
   sh.runFile(filename, args);
 }
