@@ -14,9 +14,22 @@ class ProcessCallExpr : Expr {
   }
 }
 
+class ScriptExpr : Expr {
+  Expr[] lines;
+
+  this(immutable Expr[] lines) {
+    this.lines = lines;
+  }
+}
+
 Expr parseLine(string source) {
   Parser parser = new Parser(source);
   return parser.line();
+}
+
+ScriptExpr parseScript(string source) {
+  Parser parser = new Parser(source);
+  return parser.script();
 }
 
 class ParseException : object.Exception {
@@ -33,10 +46,17 @@ private class Parser {
     this.source = source;
     this.pos = 0;
   }
+
+  ScriptExpr script() {
+    immutable Expr[] lines = many(&line);
+    return new ScriptExpr(lines);
+  }
   
   Expr line() {
+    many(&nl);
     immutable string prog = token();
     immutable string[] args = many(&entity);
+    many(&nl);
     return new ProcessCallExpr(prog, args);
   }
 
@@ -67,7 +87,11 @@ private class Parser {
   }
 
   char ws() {
-    return ch(delegate(char c) { return c == '\n' || c == '\t' || c == ' '; });
+    return ch(delegate(char c) { return c == '\t' || c == ' '; });
+  }
+
+  char nl() {
+    return ch(delegate(char c) { return c == '\n'; });
   }
 
   char stdch() {

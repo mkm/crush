@@ -3,6 +3,7 @@ module shell;
 import std.stdio;
 import std.array;
 import std.algorithm;
+import std.file;
 
 import unix;
 import syntax;
@@ -147,12 +148,28 @@ class Shell {
     }
   }
 
+  void runFile(string filename, string[] args) {
+    string content = readText(filename);
+    ScriptExpr expr = parseScript(content);
+    runScriptExpr(expr);
+  }
+  
   void runProcessCallExpr(ProcessCallExpr expr) {
     try {
       Action action = lookupAction(expr.prog);
       action.act(this, ([expr.prog] ~ expr.args).dup);
     } catch (ProcessCallException e) {
       writeln(e);
+    }
+  }
+
+  void runScriptExpr(ScriptExpr expr) {
+    foreach (line; expr.lines) {
+      if (auto pcexpr = cast(ProcessCallExpr)line) {
+        runProcessCallExpr(pcexpr);
+      } else {
+        writeln("Syntax error");        
+      }
     }
   }
   
