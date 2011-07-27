@@ -138,6 +138,28 @@ class Environment {
   }
 }
 
+interface Value {
+  StringValue toStringValue();
+}
+
+class StringValue : Value {
+  immutable string value;
+
+  this(immutable string value) {
+    this.value = value;
+  }
+
+  StringValue toStringValue() {
+    return this;
+  }
+}
+
+class NullValue : Value {
+  StringValue toStringValue() {
+    return new StringValue("null");
+  }
+}
+
 class Shell {
   private Environment env;
   private BuiltinAction[string] builtins;
@@ -165,19 +187,22 @@ class Shell {
     }
   }
 
-  void runExpr(Expr expr) {
+  Value runExpr(Expr expr) {
     if (auto x = cast(ProcessCallExpr)expr) {
-      runProcessCallExpr(x);
+      return runProcessCallExpr(x);
     } else if (auto x = cast(SequenceExpr)expr) {
-      runSequenceExpr(x);
+      return runSequenceExpr(x);
     } else if (auto x = cast(ScriptExpr)expr) {
-      runScriptExpr(x);
+      return runScriptExpr(x);
+    } else if (auto x = cast(StringLiteralExpr)expr) {
+      return new StringValue(x.value);
     } else {
       writeln("Unknown expression");
+      return new NullValue();
     }
   }
   
-  void runProcessCallExpr(ProcessCallExpr expr) {
+  Value runProcessCallExpr(ProcessCallExpr expr) {
     ProcessCall call = parseLine(expr.command);
     try {
       Action action = lookupAction(call.prog);
@@ -185,16 +210,19 @@ class Shell {
     } catch (ProcessCallException e) {
       writeln(e);
     }
+    return new NullValue();
   }
 
-  void runSequenceExpr(SequenceExpr expr) {
+  Value runSequenceExpr(SequenceExpr expr) {
+    Value value = new NullValue();
     foreach (x; expr.sequence) {
-      runExpr(x);
+      value = runExpr(x);
     }
+    return value;
   }
   
-  void runScriptExpr(ScriptExpr expr) {
-    runExpr(expr.content);
+  Value runScriptExpr(ScriptExpr expr) {
+    return runExpr(expr.content);
   }
   
   byte execProgram(string prog, string[] args) {
