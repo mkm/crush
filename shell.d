@@ -106,7 +106,7 @@ class Environment {
   }
 
   @property string[] execPath() {
-    return this["PATH"].split(":");
+    return get("PATH", "").split(":");
   }
 
   @property Path cwd() {
