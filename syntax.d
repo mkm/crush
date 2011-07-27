@@ -48,6 +48,16 @@ class StringLiteralExpr : Expr {
   }
 }
 
+class AssignmentExpr : Expr {
+  string name;
+  Expr expr;
+
+  this(immutable string name, immutable Expr expr) {
+    this.name = name;
+    this.expr = expr;
+  }
+}
+
 ProcessCall parseLine(string source) {
   LineParser parser = new LineParser(source);
   return parser.parse();
@@ -83,6 +93,12 @@ mixin template Parser(T) {
   void advance() {
     pos += 1;
   }
+
+  void end() {
+    if (!eos()) {
+      throw new ParseException("Expected end of source");
+    }
+  }
 }
 
 private class LineParser {
@@ -115,7 +131,9 @@ private class ScriptParser {
   }
   
   ScriptExpr script() {
-    return new ScriptExpr(sequence());
+    ScriptExpr expr = new ScriptExpr(sequence());
+    end();
+    return expr;
   }
 
   SequenceExpr sequence() {
@@ -129,7 +147,7 @@ private class ScriptParser {
   }
 
   Expr expr() {
-    return processCall();
+    return either([cast(Expr delegate())&assignment, cast(Expr delegate())&stringLiteral, cast(Expr delegate())&processCall]);
   }
 
   ProcessCallExpr processCall() {
@@ -137,12 +155,28 @@ private class ScriptParser {
     return new ProcessCallExpr(stringLiteral().value);
   }
 
+  AssignmentExpr assignment() {
+    string name = word();
+    equal();
+    Expr expr = expr();
+    return new AssignmentExpr("", expr);
+  }
+  
   StringLiteralExpr stringLiteral() {
     if (auto token = cast(StringLiteralToken)current()) {
       advance();
       return new StringLiteralExpr(token.value);
     } else {
       throw new ParseException("Expected string literal");
+    }
+  }
+  
+  string word() {
+    if (auto token = cast(WordToken)current()) {
+      advance();
+      return token.value;
+    } else {
+      throw new ParseException("Expected word");
     }
   }
 
@@ -159,6 +193,26 @@ private class ScriptParser {
       advance();
     } else {
       throw new ParseException("Expected atsign");
+    }
+  }
+
+  void equal() {
+    if (cast(EqualToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected equal");
+    }
+  }
+
+  Expr either(Expr delegate()[] ps) {
+    if (ps.length == 0) {
+      throw new ParseException("Alternatives exhausted");
+    } else {
+      try {
+        return ps[0]();
+      } catch (ParseException e) {
+        return either(ps[1 .. $]);
+      }
     }
   }
   
@@ -191,6 +245,10 @@ class AtsignToken : Token {
 
 class SemicolonToken : Token {
 
+}
+
+class EqualToken : Token {
+  
 }
 
 class WordToken : Token {
@@ -236,6 +294,9 @@ private class Lexer {
       } else if (c == ';') {
         tokens ~= [new SemicolonToken()];
         advance();
+      } else if (c == '=') {
+        tokens ~= [new EqualToken()];
+        advance();
       } else if (c == '"') {
         stringLiteral();
       } else if (isWhite(c)) {
@@ -273,7 +334,7 @@ private class Lexer {
   }
   
   bool isAlpha(char c) {
-    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
   }
 
   bool isWhite(char c) {
