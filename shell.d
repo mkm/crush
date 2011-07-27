@@ -148,18 +148,13 @@ class Shell {
   }
   
   void runCommand(string cmd) {
-    Expr expr = parseLine(cmd);
-    if (auto pcexpr = cast(ProcessCallExpr)expr) {
-      runProcessCallExpr(pcexpr);
-    } else {
-      writeln("Syntax error");
-    }
+    runExpr(new ProcessCallExpr(cmd));
   }
 
   void runFile(string filename, string[] args) {
     string content = readText(filename);
-    ScriptExpr expr = parseScript(content);
-    runScriptExpr(expr);
+    Expr expr = parseScript(content);
+    runExpr(expr);
   }
 
   void executeRunCommands(string rcfilename) {
@@ -169,24 +164,37 @@ class Shell {
       
     }
   }
+
+  void runExpr(Expr expr) {
+    if (auto x = cast(ProcessCallExpr)expr) {
+      runProcessCallExpr(x);
+    } else if (auto x = cast(SequenceExpr)expr) {
+      runSequenceExpr(x);
+    } else if (auto x = cast(ScriptExpr)expr) {
+      runScriptExpr(x);
+    } else {
+      writeln("Unknown expression");
+    }
+  }
   
   void runProcessCallExpr(ProcessCallExpr expr) {
+    ProcessCall call = parseLine(expr.command);
     try {
-      Action action = lookupAction(expr.prog);
-      action.act(this, ([expr.prog] ~ expr.args).dup);
+      Action action = lookupAction(call.prog);
+      action.act(this, ([call.prog] ~ call.args).dup);
     } catch (ProcessCallException e) {
       writeln(e);
     }
   }
 
-  void runScriptExpr(ScriptExpr expr) {
-    foreach (line; expr.lines) {
-      if (auto pcexpr = cast(ProcessCallExpr)line) {
-        runProcessCallExpr(pcexpr);
-      } else {
-        writeln("Syntax error");        
-      }
+  void runSequenceExpr(SequenceExpr expr) {
+    foreach (x; expr.sequence) {
+      runExpr(x);
     }
+  }
+  
+  void runScriptExpr(ScriptExpr expr) {
+    runExpr(expr.content);
   }
   
   byte execProgram(string prog, string[] args) {

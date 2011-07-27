@@ -1,10 +1,8 @@
 module syntax;
 
-immutable class Expr {
-  
-}
+import std.array;
 
-class ProcessCallExpr : Expr {
+immutable class ProcessCall {
   string prog;
   string[] args;
 
@@ -14,22 +12,50 @@ class ProcessCallExpr : Expr {
   }
 }
 
-class ScriptExpr : Expr {
-  Expr[] lines;
+immutable class Expr {
+  
+}
 
-  this(immutable Expr[] lines) {
-    this.lines = lines;
+class ProcessCallExpr : Expr {
+  string command;
+
+  this(immutable string command) {
+    this.command = command;
   }
 }
 
-Expr parseLine(string source) {
-  Parser parser = new Parser(source);
-  return parser.line();
+class ScriptExpr : Expr {
+  Expr content;
+
+  this(Expr content) {
+    this.content = content;
+  }
+}
+
+class SequenceExpr : Expr {
+  Expr[] sequence;
+
+  this(immutable Expr[] sequence) {
+    this.sequence = sequence;
+  }
+}
+
+class StringLiteralExpr : Expr {
+  string value;
+
+  this(string value) {
+    this.value = value;
+  }
+}
+
+ProcessCall parseLine(string source) {
+  LineParser parser = new LineParser(source);
+  return parser.parse();
 }
 
 ScriptExpr parseScript(string source) {
-  Parser parser = new Parser(source);
-  return parser.script();
+  ScriptParser parser = new ScriptParser(source);
+  return parser.parse();
 }
 
 class ParseException : object.Exception {
@@ -38,81 +64,101 @@ class ParseException : object.Exception {
   }
 }
 
-private class Parser {
-  private string source;
+mixin template Parser(T) {
+  private immutable(T)[] source;
   private int pos;
+  
+  bool eos() {
+    return pos >= source.length;
+  }
+  
+  immutable(T) current() {
+    if (eos()) {
+      throw new ParseException("End of source");
+    } else {
+      return source[pos];
+    }
+  }
+  
+  void advance() {
+    pos += 1;
+  }
+}
+
+private class LineParser {
+  mixin Parser!(immutable(char));
   
   this(string source) {
     this.source = source;
     this.pos = 0;
   }
 
-  ScriptExpr script() {
-    immutable Expr[] lines = many(&line);
-    return new ScriptExpr(lines);
+  ProcessCall parse() {
+    immutable string[] words = source.split(" ").idup;
+    if (words.length == 0) {
+      throw new ParseException("No words in command");
+    }
+    return new ProcessCall(words[0], words[1 .. $]);
   }
+}
+
+private class ScriptParser {
+  mixin Parser!(Token);
   
-  Expr line() {
-    many(&nl);
-    immutable string prog = token();
-    immutable string[] args = many(&entity);
-    many(&nl);
-    return new ProcessCallExpr(prog, args);
+  this(string source) {
+    this.source = lex(source);
+    this.pos = 0;
   }
 
-  string entity() {
-    int pos = this.pos;
-    try {
-      return quotedToken();
-    } catch (ParseException e) {
-      this.pos = pos;
-      return token();
+  ScriptExpr parse() {
+    return script();
+  }
+  
+  ScriptExpr script() {
+    return new ScriptExpr(sequence());
+  }
+
+  SequenceExpr sequence() {
+    return new SequenceExpr(many(&stmt));
+  }
+
+  Expr stmt() {
+    Expr expr = expr();
+    semicolon();
+    return expr;
+  }
+
+  Expr expr() {
+    return processCall();
+  }
+
+  ProcessCallExpr processCall() {
+    atsign();
+    return new ProcessCallExpr(stringLiteral().value);
+  }
+
+  StringLiteralExpr stringLiteral() {
+    if (auto token = cast(StringLiteralToken)current()) {
+      advance();
+      return new StringLiteralExpr(token.value);
+    } else {
+      throw new ParseException("Expected string literal");
     }
   }
-  
-  string token() {
-    many(&ws);
-    string s = many1(&stdch);
-    many(&ws);
-    return s;
-  }
 
-  string quotedToken() {
-    many(&ws);
-    quote();
-    string s = many(&nonquote);
-    quote();
-    many(&ws);
-    return s;
-  }
-
-  char ws() {
-    return ch(delegate(char c) { return c == '\t' || c == ' '; });
-  }
-
-  char nl() {
-    return ch(delegate(char c) { return c == '\n'; });
-  }
-
-  char stdch() {
-    return ch(delegate(char c) { return c > ' ' && c != '"'; });
-  }
-
-  char quote() {
-    return ch(delegate(char c) { return c == '"'; });
-  }
-
-  char nonquote() {
-    return ch(delegate(char c) { return c != '"'; });
-  }
-
-  char ch(bool delegate(char) pred) {
-    char c = current();
-    if (pred(c)) {
+  void semicolon() {
+    if (cast(SemicolonToken)current()) {
       advance();
-      return c;
     } else {
-      throw new ParseException("Unexpected character");
+      throw new ParseException("Expected semicoloon");
+    }
+  }
+
+  void atsign() {
+    if (cast(AtsignToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected atsign");
     }
   }
   
@@ -133,17 +179,104 @@ private class Parser {
     immutable T[] xs = many(p);
     return x ~ xs;
   }
+}
 
-  char current() {
-    if (pos < source.length) {
-      return source[pos];
-    } else {
-      throw  new ParseException("End of source");
-    }
-  }
+immutable class Token {
 
-  void advance() {
-    pos += 1;
+};
+
+class AtsignToken : Token {
+
+}
+
+class SemicolonToken : Token {
+
+}
+
+class WordToken : Token {
+  string value;
+
+  this(string value) {
+    this.value = value;
   }
 }
 
+class StringLiteralToken : Token {
+  string value;
+
+  this(string value) {
+    this.value = value;
+  }
+}
+
+immutable(Token)[] lex(string source) {
+  Lexer lexer = new Lexer(source);
+  return lexer.lex();
+}
+
+private class Lexer {
+  mixin Parser!(immutable(char));
+  
+  private Token[] tokens;
+
+  this(string source) {
+    this.source = source;
+    this.pos = 0;
+    this.tokens = [];
+  }
+
+  immutable(Token)[] lex() {
+    while (!eos()) {
+      char c = current();
+      if (isAlpha(c)) {
+        word();
+      } else if (c == '@') {
+        tokens ~= [new AtsignToken()];
+        advance();
+      } else if (c == ';') {
+        tokens ~= [new SemicolonToken()];
+        advance();
+      } else if (c == '"') {
+        stringLiteral();
+      } else if (isWhite(c)) {
+        advance();
+      } else {
+        throw new ParseException("Unknown character");
+      }
+    }
+    return cast(immutable(Token)[])tokens;
+  }
+
+  void word() {
+    char c;
+    string s;
+    do {
+      s ~= [current()];
+      advance();
+      c = current();
+    } while (isAlpha(c));
+    tokens ~= [new WordToken(s)];
+  }
+
+  void stringLiteral() {
+    char c;
+    string s;
+    advance(); // Skip start quote
+    c = current();
+    while (c != '"') {
+      s ~= [c];
+      advance();
+      c = current();
+    }
+    advance(); // Skip end quote
+    tokens ~= [new StringLiteralToken(s)];
+  }
+  
+  bool isAlpha(char c) {
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+  }
+
+  bool isWhite(char c) {
+    return c == ' ' || c == '\n' || c == '\t';
+  }
+}
