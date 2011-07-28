@@ -163,6 +163,7 @@ class NullValue : Value {
 class Shell {
   private Environment env;
   private BuiltinAction[string] builtins;
+  private Value[string] vars;
 
   this(Environment env) {
     this.env = env;
@@ -263,7 +264,16 @@ class Shell {
   }
 
   @property string prompt() {
-    return env.cwd.toString() ~ "$ ";
+    string promptSpec = vars.get("_prompt", new StringValue("%$ ")).toStringValue().value;
+    string prompt = "";
+    foreach (char c; promptSpec) {
+      if (c == '%') {
+        prompt ~= env.cwd.toString();
+      } else {
+        prompt ~= [c];
+      }
+    }
+    return prompt;
   }
 }
 
