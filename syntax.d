@@ -159,7 +159,7 @@ private class ScriptParser {
     string name = word();
     equal();
     Expr expr = expr();
-    return new AssignmentExpr("", expr);
+    return new AssignmentExpr(name, expr);
   }
   
   StringLiteralExpr stringLiteral() {
