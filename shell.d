@@ -251,24 +251,31 @@ class Shell {
   }
 
   Action lookupAction(string prog) {
+    string aliasName = "_alias_" ~ prog;
+    if (aliasName in vars) {
+      return lookupAction(vars[aliasName].toStringValue().value);
+    }
+    
     if (prog in builtins) {
       return builtins[prog];
-    } else if (prog.canFind('/')) {
+    }
+    
+    if (prog.canFind('/')) {
       if (isExecutable(prog)) {
         return new ProcessCallAction(prog);
       } else {
         throw new ProcessCallException("Not allowed");
       }
-    } else {
-      string[] execPath = env.execPath;
-      foreach (string folder; execPath) {
-        string progName = folder ~ "/" ~ prog;
-        if (isExecutable(progName)) {
-          return new ProcessCallAction(progName);
-        }
-      }
-      throw new ProcessCallException("Not found");
     }
+    
+    string[] execPath = env.execPath;
+    foreach (string folder; execPath) {
+      string progName = folder ~ "/" ~ prog;
+      if (isExecutable(progName)) {
+        return new ProcessCallAction(progName);
+      }
+    }
+    throw new ProcessCallException("Not found");
   }
 
   @property string prompt() {
