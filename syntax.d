@@ -58,6 +58,14 @@ class AssignmentExpr : Expr {
   }
 }
 
+class VariableExpr : Expr {
+  string name;
+
+  this(immutable string name) {
+    this.name = name;
+  }
+}
+
 ProcessCall parseLine(string source) {
   LineParser parser = new LineParser(source);
   return parser.parse();
@@ -147,7 +155,7 @@ private class ScriptParser {
   }
 
   Expr expr() {
-    return either([cast(Expr delegate())&assignment, cast(Expr delegate())&stringLiteral, cast(Expr delegate())&processCall]);
+    return either([cast(Expr delegate())preserving(cast(Expr delegate())&assignment), cast(Expr delegate())&stringLiteral, cast(Expr delegate())&processCall, cast(Expr delegate())&variable]);
   }
 
   ProcessCallExpr processCall() {
@@ -160,6 +168,11 @@ private class ScriptParser {
     equal();
     Expr expr = expr();
     return new AssignmentExpr(name, expr);
+  }
+
+  VariableExpr variable() {
+    string name = word();
+    return new VariableExpr(name);
   }
   
   StringLiteralExpr stringLiteral() {
@@ -214,6 +227,18 @@ private class ScriptParser {
         return either(ps[1 .. $]);
       }
     }
+  }
+
+  Expr delegate() preserving(Expr delegate() p) {
+    return delegate() {
+      int oldPos = pos;
+      try {
+        return p();
+      } catch (ParseException e) {
+        pos = oldPos;
+        throw e;
+      }
+    };
   }
   
   immutable(T[]) many(T)(T delegate() p) {

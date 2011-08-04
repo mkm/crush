@@ -199,6 +199,8 @@ class Shell {
       return new StringValue(x.value);
     } else if (auto x = cast(AssignmentExpr)expr) {
       return runAssignmentExpr(x);
+    } else if (auto x = cast(VariableExpr)expr) {
+      return runVariableExpr(x);
     } else {
       writeln("Unknown expression");
       return new NullValue();
@@ -228,6 +230,10 @@ class Shell {
     Value value = runExpr(expr.expr);
     vars[expr.name] = value;
     return value;
+  }
+
+  Value runVariableExpr(VariableExpr expr) {
+    return vars[expr.name];
   }
   
   Value runScriptExpr(ScriptExpr expr) {
