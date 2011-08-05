@@ -66,6 +66,16 @@ class VariableExpr : Expr {
   }
 }
 
+class LambdaExpr : Expr {
+  string[] parameters;
+  Expr content;
+
+  this(immutable string[] parameters, immutable Expr content) {
+    this.parameters = parameters;
+    this.content = content;
+  }
+}
+
 ProcessCall parseLine(string source) {
   LineParser parser = new LineParser(source);
   return parser.parse();
@@ -155,7 +165,7 @@ private class ScriptParser {
   }
 
   Expr expr() {
-    return either([cast(Expr delegate())preserving(cast(Expr delegate())&assignment), cast(Expr delegate())&stringLiteral, cast(Expr delegate())&processCall, cast(Expr delegate())&variable]);
+    return either([cast(Expr delegate())preserving(cast(Expr delegate())&assignment), cast(Expr delegate())&stringLiteral, cast(Expr delegate())&processCall, cast(Expr delegate())&variable, cast(Expr delegate())&lambda]);
   }
 
   ProcessCallExpr processCall() {
@@ -173,6 +183,16 @@ private class ScriptParser {
   VariableExpr variable() {
     string name = word();
     return new VariableExpr(name);
+  }
+
+  LambdaExpr lambda() {
+    exclamation();
+    leftParen();
+    rightParen();
+    leftBrace();
+    Expr content = stmt();
+    rightBrace();
+    return new LambdaExpr([], content);
   }
   
   StringLiteralExpr stringLiteral() {
@@ -217,6 +237,46 @@ private class ScriptParser {
     }
   }
 
+  void exclamation() {
+    if (cast(ExclamationToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected exclamation");
+    }
+  }
+  
+  void leftParen() {
+    if (cast(LeftParenToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected left parenthesis");
+    }
+  }
+  
+  void rightParen() {
+    if (cast(RightParenToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected right parenthesis");
+    }
+  }
+  
+  void leftBrace() {
+    if (cast(LeftBraceToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected left brace");
+    }
+  }
+  
+  void rightBrace() {
+    if (cast(RightBraceToken)current()) {
+      advance();
+    } else {
+      throw new ParseException("Expected right brace");
+    }
+  }
+  
   Expr either(Expr delegate()[] ps) {
     if (ps.length == 0) {
       throw new ParseException("Alternatives exhausted");
@@ -276,6 +336,26 @@ class EqualToken : Token {
   
 }
 
+class ExclamationToken : Token {
+  
+}
+
+class LeftParenToken : Token {
+  
+}
+
+class RightParenToken : Token {
+  
+}
+
+class LeftBraceToken : Token {
+  
+}
+
+class RightBraceToken : Token {
+  
+}
+
 class WordToken : Token {
   string value;
 
@@ -321,6 +401,21 @@ private class Lexer {
         advance();
       } else if (c == '=') {
         tokens ~= [new EqualToken()];
+        advance();
+      } else if (c == '!') {
+        tokens ~= [new ExclamationToken()];
+        advance();
+      } else if (c == '(') {
+        tokens ~= [new LeftParenToken()];
+        advance();
+      } else if (c == ')') {
+        tokens ~= [new RightParenToken()];
+        advance();
+      } else if (c == '{') {
+        tokens ~= [new LeftBraceToken()];
+        advance();
+      } else if (c == '}') {
+        tokens ~= [new RightBraceToken()];
         advance();
       } else if (c == '"') {
         stringLiteral();
